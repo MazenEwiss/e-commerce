@@ -17,6 +17,7 @@ import com.mazen.ecommerce.wallet_service.repository.WalletRepository;
 
 @Service
 public class WalletService {
+
     private final WalletRepository walletRepository;
     private final TransactionRepository transactionRepository;
 
@@ -24,6 +25,7 @@ public class WalletService {
         this.walletRepository = walletRepository;
         this.transactionRepository = transactionRepository;
     }
+
     public Transaction depositToWallet(Long userId, BigDecimal amount) {
         var wallet = walletRepository.findByUserId(userId)
                 .orElseThrow(() -> new WalletNotFoundException("Wallet not found for user: " + userId));
@@ -34,6 +36,7 @@ public class WalletService {
         transactionRepository.save(transaction);
         return transaction;
     }
+
     public Transaction withdrawFromWallet(Long userId, BigDecimal amount) {
         var wallet = walletRepository.findByUserId(userId)
                 .orElseThrow(() -> new WalletNotFoundException("Wallet not found for user: " + userId));
@@ -49,11 +52,13 @@ public class WalletService {
         transactionRepository.save(transaction);
         return transaction;
     }
+
     public List<Transaction> getTransactionHistory(Long userId) {
         var wallet = walletRepository.findByUserId(userId)
                 .orElseThrow(() -> new WalletNotFoundException("Wallet not found for user: " + userId));
         return transactionRepository.findByWallet_WalletIdOrderByTimestampDesc(wallet.getWalletId());
     }
+
     @Transactional
     public List<Transaction> transferBetweenWallets(Long fromUserId, Long toUserId, BigDecimal amount) {
         var fromWallet = walletRepository.findByUserId(fromUserId)
@@ -77,4 +82,5 @@ public class WalletService {
         transactionRepository.save(toTransaction);
         return Arrays.asList(transaction, toTransaction);
     }
+
 }

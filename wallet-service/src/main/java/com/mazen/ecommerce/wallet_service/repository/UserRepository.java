@@ -8,5 +8,9 @@ import com.mazen.ecommerce.wallet_service.model.User;
 
 public interface UserRepository extends  JpaRepository<User, Long> {
     Optional<User> findByEmail(String email);
-    
+
+    Optional<User> findByUserName(String username);
+    public boolean existsByEmail(String email);
+    public boolean existsByUserName(String username);
+
 }
