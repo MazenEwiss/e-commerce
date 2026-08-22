@@ -32,6 +32,7 @@ public class Payment {
     @NotNull
     @DecimalMin(value = "0.00", message = "Amount must be a positive value")
     private BigDecimal amount;
+    private Long walletTransactionId;
 
     public Payment() {
     }
@@ -74,5 +75,13 @@ public class Payment {
 
     public void setAmount(BigDecimal amount) {
         this.amount = amount;
+    }
+
+    public Long getWalletTransactionId() {
+        return walletTransactionId;
+    }
+
+    public void setWalletTransactionId(Long walletTransactionId) {
+        this.walletTransactionId = walletTransactionId;
     }
 }

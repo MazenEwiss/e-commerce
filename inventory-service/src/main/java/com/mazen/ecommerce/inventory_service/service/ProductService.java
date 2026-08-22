@@ -10,6 +10,8 @@ import com.mazen.ecommerce.inventory_service.model.Category;
 import com.mazen.ecommerce.inventory_service.model.Product;
 import com.mazen.ecommerce.inventory_service.repository.ProductRepository;
 
+import jakarta.transaction.Transactional;
+
 @Service
 public class ProductService {
 
@@ -18,6 +20,7 @@ public class ProductService {
     public ProductService(ProductRepository productRepository) {
         this.productRepository = productRepository;
     }
+    @Transactional
      public Product purchaseProduct(Long productId, int quantity) {
         Product product = productRepository.findById(productId)
                 .orElseThrow(() -> new ProductNotFoundException("Product not found with ID: " + productId));
@@ -34,5 +37,11 @@ public class ProductService {
     }
     public List<Product> getProductsByCategory(Category category) {
         return productRepository.findByCategory(category);
+    }
+    @Transactional
+    public void restockProduct(Long productId, int quantity) {
+        if (productRepository.restoreStock(productId, quantity) == 0) {
+            throw new ProductNotFoundException("Product not found with ID: " + productId);
+        }
     }
 }

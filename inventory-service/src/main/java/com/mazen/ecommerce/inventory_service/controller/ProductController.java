@@ -3,7 +3,6 @@ package com.mazen.ecommerce.inventory_service.controller;
 import java.util.List;
 
 import org.springframework.http.ResponseEntity;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -36,10 +35,14 @@ public class ProductController {
     }
 
     @PostMapping("/{productId}/purchase/{quantity}")
-    @Transactional
     public ResponseEntity<Product> purchaseProduct(@PathVariable Long productId, @PathVariable int quantity) {
         Product product = productService.purchaseProduct(productId, quantity);
         return ResponseEntity.ok(product);
     }
-    
+
+    @PostMapping("/{productId}/restock/{quantity}")
+    public ResponseEntity<Void> restockProduct(@PathVariable Long productId, @PathVariable int quantity) {
+        productService.restockProduct(productId, quantity);
+        return ResponseEntity.ok().build();
+    }
 }
