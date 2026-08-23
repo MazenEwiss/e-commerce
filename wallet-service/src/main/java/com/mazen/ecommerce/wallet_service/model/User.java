@@ -1,11 +1,12 @@
 package com.mazen.ecommerce.wallet_service.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
 import jakarta.persistence.OneToOne;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
@@ -25,8 +26,10 @@ public class User {
     @NotBlank
     private String email;
     @NotBlank
+    @JsonIgnore
     private String password;
     @OneToOne(mappedBy = "user")
+    @JsonIgnore
     private Wallet wallet;
 
     public Long getId() {

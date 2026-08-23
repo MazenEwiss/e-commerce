@@ -29,7 +29,7 @@ public class PaymentService {
         payment.setPaymentDate(new java.util.Date());
         payment.setAmount(order.getTotalPrice());
         try {
-            var response = walletClient.withdraw(order.getUserId(), order.getTotalPrice());
+            var response = walletClient.withdraw( order.getTotalPrice());
             if (response.getBody() != null) {
                 if (response.getStatusCode().is2xxSuccessful()) {
                     payment.setPaymentStatus(com.mazen.ecommerce.shop_service.model.PaymentStatus.SUCCESS);

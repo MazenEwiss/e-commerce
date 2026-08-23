@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.mazen.ecommerce.shop_service.dto.OrderRequestDto;
 import com.mazen.ecommerce.shop_service.dto.OrderResponseDto;
 import com.mazen.ecommerce.shop_service.service.OrderService;
+import com.mazen.ecommerce.shop_service.util.AuthUtil;
 
 import jakarta.validation.Valid;
 
@@ -29,7 +30,8 @@ public class OrderController {
 
     @PostMapping
     public ResponseEntity<OrderResponseDto> placeOrder(@Valid @RequestBody OrderRequestDto requestDto) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(orderService.placeOrder(requestDto));
+        Long userId = AuthUtil.getCurrentUserId();
+        return ResponseEntity.status(HttpStatus.CREATED).body(orderService.placeOrder(requestDto, userId));
     }
 
     @GetMapping("/{id}")
@@ -37,9 +39,9 @@ public class OrderController {
         return ResponseEntity.ok(orderService.getOrderById(id));
     }
 
-    @GetMapping("/user/{userId}")
-    public ResponseEntity<List<OrderResponseDto>> getOrdersByUserId(@PathVariable Long userId) {
-        List<OrderResponseDto> ordersResponse = orderService.getOrdersByUserId(userId);
-        return ResponseEntity.ok(ordersResponse);
+    @GetMapping("/mine")
+    public ResponseEntity<List<OrderResponseDto>> getMyOrders() {
+        Long userId = AuthUtil.getCurrentUserId();
+        return ResponseEntity.ok(orderService.getOrdersByUserId(userId));
     }
 }

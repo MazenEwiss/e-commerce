@@ -60,9 +60,9 @@ public class OrderService {
         return responseDto;
     }
 
-    public OrderResponseDto placeOrder(OrderRequestDto requestDto) {
+    public OrderResponseDto placeOrder(OrderRequestDto requestDto, Long userId) {
         Order order = new Order();
-        order.setUserId(requestDto.getUserId());
+        order.setUserId(userId);
         order.setStatus(OrderStatus.PENDING);
         order.setOrderDate(new Date());
 
