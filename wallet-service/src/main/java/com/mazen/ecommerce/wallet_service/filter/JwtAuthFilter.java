@@ -25,22 +25,24 @@ public class JwtAuthFilter extends OncePerRequestFilter {
     }
 
     @Override
-    protected void doFilterInternal( HttpServletRequest request,
-                                      HttpServletResponse response,
-                                      FilterChain filterChain) throws ServletException, IOException {
+    protected void doFilterInternal(HttpServletRequest request,
+            HttpServletResponse response,
+            FilterChain filterChain) throws ServletException, IOException {
         String authHeader = request.getHeader("Authorization");
 
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
             String token = authHeader.substring(7);
             try {
                 Long userId = jwtService.extractUserId(token);
+                System.out.println("JWT OK - method=" + request.getMethod() + " userId=" + userId);
                 var authToken = new UsernamePasswordAuthenticationToken(
                         userId, null, Collections.emptyList());
                 SecurityContextHolder.getContext().setAuthentication(authToken);
             } catch (Exception e) {
-                // Invalid/expired token - leave SecurityContext empty, let SecurityConfig's
-                // authorization rules decide whether the endpoint requires auth
+                System.out.println("JWT FAILED - method=" + request.getMethod() + " error=" + e.getMessage());
             }
+        } else {
+            System.out.println("NO AUTH HEADER - method=" + request.getMethod());
         }
 
         filterChain.doFilter(request, response);

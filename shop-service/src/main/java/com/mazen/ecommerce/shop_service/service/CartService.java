@@ -6,19 +6,24 @@ import java.util.Optional;
 
 import org.springframework.stereotype.Service;
 
+import com.mazen.ecommerce.shop_service.client.InventoryClient;
 import com.mazen.ecommerce.shop_service.dto.CartItemResponseDto;
 import com.mazen.ecommerce.shop_service.dto.CartResponseDto;
+import com.mazen.ecommerce.shop_service.exception.ProductNotFoundException;
 import com.mazen.ecommerce.shop_service.model.Cart;
 import com.mazen.ecommerce.shop_service.model.CartItem;
 import com.mazen.ecommerce.shop_service.repository.CartRepository;
+
+import feign.FeignException;
 
 @Service
 public class CartService {
 
     private CartRepository cartRepository;
-
-    public CartService(CartRepository cartRepo) {
+    private final InventoryClient inventoryClient;
+    public CartService(CartRepository cartRepo, InventoryClient inventoryClient) {
         this.cartRepository = cartRepo;
+        this.inventoryClient = inventoryClient;
     }
 
     private Cart getOrCreateCart(Long userId) {
@@ -32,6 +37,11 @@ public class CartService {
     }
 
     public CartResponseDto addItemToCart(Long userId, Long productId, int quantity) {
+        try {
+            inventoryClient.getProduct(productId);
+        } catch (FeignException.NotFound e) {
+            throw new ProductNotFoundException("Product not found: " + productId);
+        }
         Cart cart = getOrCreateCart(userId);
 
         Optional<CartItem> existingItem = cart.getCartItems().stream()
@@ -89,18 +99,19 @@ public class CartService {
 
         return dto;
     }
+
     public CartResponseDto updateItemQuantity(Long userId, Long cartItemId, int newQuantity) {
-    Cart cart = getOrCreateCart(userId);
+        Cart cart = getOrCreateCart(userId);
 
-    CartItem item = cart.getCartItems().stream()
-            .filter(i -> i.getCartItemId().equals(cartItemId))
-            .findFirst()
-            .orElseThrow(() -> new RuntimeException("Cart item not found: " + cartItemId));
+        CartItem item = cart.getCartItems().stream()
+                .filter(i -> i.getCartItemId().equals(cartItemId))
+                .findFirst()
+                .orElseThrow(() -> new RuntimeException("Cart item not found: " + cartItemId));
 
-    // your code: set the new quantity on `item`
-    item.setQuantity(newQuantity);
+        // your code: set the new quantity on `item`
+        item.setQuantity(newQuantity);
 
-    return toCartResponseDto(cartRepository.save(cart));
-}
+        return toCartResponseDto(cartRepository.save(cart));
+    }
 
 }

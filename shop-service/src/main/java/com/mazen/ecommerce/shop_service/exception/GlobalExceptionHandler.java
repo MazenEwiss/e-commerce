@@ -16,6 +16,10 @@ public class GlobalExceptionHandler {
     public ResponseEntity<String> handleOrderPlacementFailed(OrderPlacementFailedException ex) {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(ex.getMessage());
     }
+    @ExceptionHandler(ProductNotFoundException.class)
+    public ResponseEntity<String> handleProductNotFound(ProductNotFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ex.getMessage());
+    }
 }
 
 

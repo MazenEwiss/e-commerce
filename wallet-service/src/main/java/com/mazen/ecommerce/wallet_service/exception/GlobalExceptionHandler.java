@@ -15,4 +15,12 @@ public class GlobalExceptionHandler {
     public ResponseEntity<String> handleInsufficientBalance(InsufficientBalanceException ex) {
         return ResponseEntity.badRequest().body(ex.getMessage());
     }
+    @ExceptionHandler(UserNotFoundException.class)
+    public ResponseEntity<String> handleUserNotFound(UserNotFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ex.getMessage());
+    }
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<String> handleIllegalArgumentException(IllegalArgumentException ex) {
+        return ResponseEntity.badRequest().body(ex.getMessage());
+    }
 }

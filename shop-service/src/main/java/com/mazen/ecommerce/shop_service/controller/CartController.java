@@ -8,11 +8,11 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.mazen.ecommerce.shop_service.dto.AddCartItemRequestDto;
 import com.mazen.ecommerce.shop_service.dto.CartResponseDto;
+import com.mazen.ecommerce.shop_service.dto.UpdateQuantityDto;
 import com.mazen.ecommerce.shop_service.service.CartService;
 import com.mazen.ecommerce.shop_service.util.AuthUtil;
 
@@ -55,9 +55,9 @@ public class CartController {
     }
 
     @PutMapping("/mine/items/{cartItemId}")
-    public ResponseEntity<CartResponseDto> updateItemQuantity(@PathVariable Long cartItemId, @RequestParam int quantity) {
+    public ResponseEntity<CartResponseDto> updateItemQuantity(@PathVariable Long cartItemId,@Valid @RequestBody UpdateQuantityDto quantity) {
         Long userId = AuthUtil.getCurrentUserId();
-        CartResponseDto updatedCart = cartService.updateItemQuantity(userId, cartItemId, quantity);
+        CartResponseDto updatedCart = cartService.updateItemQuantity(userId, cartItemId, quantity.getQuantity());
         return ResponseEntity.ok(updatedCart);
     }
 }
