@@ -2,7 +2,6 @@ package com.mazen.ecommerce.shop_service.service;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
 
 import org.springframework.http.ResponseEntity;
@@ -11,19 +10,22 @@ import org.springframework.stereotype.Service;
 import com.mazen.ecommerce.shop_service.client.InventoryClient;
 import com.mazen.ecommerce.shop_service.dto.OrderItemRequestDto;
 import com.mazen.ecommerce.shop_service.dto.OrderItemResponseDto;
-import com.mazen.ecommerce.shop_service.dto.OrderRequestDto;
 import com.mazen.ecommerce.shop_service.dto.OrderResponseDto;
 import com.mazen.ecommerce.shop_service.dto.ProductResponseDto;
+import com.mazen.ecommerce.shop_service.exception.OrderNotCancellableException;
 import com.mazen.ecommerce.shop_service.exception.OrderNotFoundException;
 import com.mazen.ecommerce.shop_service.exception.OrderPlacementFailedException;
+import com.mazen.ecommerce.shop_service.model.Cart;
 import com.mazen.ecommerce.shop_service.model.Order;
 import com.mazen.ecommerce.shop_service.model.OrderItem;
 import com.mazen.ecommerce.shop_service.model.OrderStatus;
 import com.mazen.ecommerce.shop_service.model.Payment;
 import com.mazen.ecommerce.shop_service.model.PaymentStatus;
+import com.mazen.ecommerce.shop_service.repository.CartRepository;
 import com.mazen.ecommerce.shop_service.repository.OrderRepository;
 
 import feign.FeignException;
+import jakarta.transaction.Transactional;
 
 @Service
 public class OrderService {
@@ -31,11 +33,15 @@ public class OrderService {
     private final OrderRepository orderRepository;
     private final PaymentService paymentService;
     private final InventoryClient inventoryClient;
+    private final CartRepository cartRepository;
+    private final CartService cartService;
 
-    public OrderService(OrderRepository orderRepository, PaymentService paymentService, InventoryClient inventoryClient) {
+    public OrderService(OrderRepository orderRepository, CartRepository cartRepository, CartService cartService, PaymentService paymentService, InventoryClient inventoryClient) {
         this.orderRepository = orderRepository;
         this.paymentService = paymentService;
         this.inventoryClient = inventoryClient;
+        this.cartRepository = cartRepository;
+        this.cartService = cartService;
     }
 
     private OrderResponseDto toOrderResponseDto(Order saved) {
@@ -60,43 +66,38 @@ public class OrderService {
         return responseDto;
     }
 
-    public OrderResponseDto placeOrder(OrderRequestDto requestDto, Long userId) {
-        Order order = new Order();
-        order.setUserId(userId);
-        order.setStatus(OrderStatus.PENDING);
-        order.setOrderDate(new Date());
+    @Transactional
+    public OrderResponseDto placeOrder(Long userId) {
 
+        Order order = cartService.getCheckoutCart(userId);
+        Cart cart = cartRepository.findByUserId(userId)
+                .orElseThrow(() -> new RuntimeException("Cart not found for user: " + userId));
         List<OrderItem> orderItems = new ArrayList<>();
         // Tracks items successfully reserved so far, so we can compensate (restock) if a later item fails
         List<OrderItemRequestDto> reservedItems = new ArrayList<>();
 
-        for (OrderItemRequestDto itemDto : requestDto.getOrderItems()) {
+        for (OrderItem item : order.getOrderItems()) {
             try {
-                ResponseEntity<ProductResponseDto> response
-                        = inventoryClient.purchaseProduct(itemDto.getProductId(), itemDto.getQuantity());
-                ProductResponseDto product = response.getBody();
-
-                OrderItem item = new OrderItem();
-                item.setProductId(itemDto.getProductId());
-                item.setQuantity(itemDto.getQuantity());
-                item.setPriceAtPurchase(product.getPrice()); // real price from Inventory, not client input
-                item.setOrder(order);
+                ResponseEntity<ProductResponseDto> productResponse = inventoryClient.getProduct(item.getProductId());
+                ProductResponseDto product = productResponse.getBody();
+                if (product.getQuantity() < item.getQuantity()) {
+                    throw new OrderPlacementFailedException("Insufficient stock for product: " + item.getProductId());
+                }
+                // Reserve the stock
+                inventoryClient.purchaseProduct(item.getProductId(), item.getQuantity());
+                reservedItems.add(new OrderItemRequestDto(item.getProductId(), item.getQuantity()));
                 orderItems.add(item);
-
-                reservedItems.add(itemDto);
             } catch (FeignException e) {
-                // Roll back every item already reserved in this attempt
+                // If any product fails, we need to restock previously reserved items
                 for (OrderItemRequestDto toRestore : reservedItems) {
                     try {
                         inventoryClient.restockProduct(toRestore.getProductId(), toRestore.getQuantity());
                     } catch (FeignException restoreEx) {
-                        // Compensation itself failed - stock is now stuck reserved. Worth logging/alerting
-                        // once real logging exists; for now the original failure still surfaces below.
+                        // Log the error; in a real application, consider retrying or alerting
                         System.err.println("Failed to restock product " + toRestore.getProductId() + ": " + restoreEx.getMessage());
                     }
                 }
-                throw new OrderPlacementFailedException(
-                        "Could not reserve product " + itemDto.getProductId() + ": " + e.getMessage());
+                throw new OrderPlacementFailedException("Failed to place order due to product issues: " + e.getMessage());
             }
         }
 
@@ -113,6 +114,8 @@ public class OrderService {
 
         if (payment.getPaymentStatus() == PaymentStatus.SUCCESS) {
             saved.setStatus(OrderStatus.PROCESSING);
+            cartService.clearCart(cart.getUserId()); // Clear the cart after converting to order
+            cartRepository.save(cart); // Save the cleared cart
         } else {
             saved.setStatus(OrderStatus.PAYMENT_FAILED);
             // Payment failed after stock was already reserved - give it all back
@@ -127,6 +130,7 @@ public class OrderService {
         }
 
         Order finalSaved = orderRepository.save(saved);
+
         return toOrderResponseDto(finalSaved);
     }
 
@@ -141,5 +145,32 @@ public class OrderService {
         return orders.stream()
                 .map(this::toOrderResponseDto)
                 .toList();
+    }
+
+    public OrderResponseDto cancelOrder(Long orderId, Long userId) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new OrderNotFoundException("Order not found with id: " + orderId));
+
+        if (!order.getUserId().equals(userId)) {
+            throw new OrderNotFoundException("Order not found for this user with id: " + orderId);
+        }
+
+        if (order.getStatus() != OrderStatus.PENDING && order.getStatus() != OrderStatus.PROCESSING) {
+            throw new OrderNotCancellableException("Order cannot be cancelled in its current status: " + order.getStatus());
+        }
+
+        // Restock the items
+        for (OrderItem item : order.getOrderItems()) {
+            try {
+                inventoryClient.restockProduct(item.getProductId(), item.getQuantity());
+            } catch (FeignException e) {
+                // Log the error; in a real application, consider retrying or alerting
+                System.err.println("Failed to restock product " + item.getProductId() + ": " + e.getMessage());
+            }
+        }
+
+        order.setStatus(OrderStatus.CANCELLED);
+        Order saved = orderRepository.save(order);
+        return toOrderResponseDto(saved);
     }
 }

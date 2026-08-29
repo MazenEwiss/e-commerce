@@ -12,6 +12,12 @@ public class OrderItemRequestDto {
     public Long getProductId() {
         return productId;
     }
+    public OrderItemRequestDto() {
+    }
+    public OrderItemRequestDto(Long productId, Integer quantity) {
+        this.productId = productId;
+        this.quantity = quantity;
+    }
     public void setProductId(Long productId) {
         this.productId = productId;
     }

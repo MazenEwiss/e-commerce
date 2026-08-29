@@ -1,28 +1,40 @@
 package com.mazen.ecommerce.shop_service.service;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.Optional;
 
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
 import com.mazen.ecommerce.shop_service.client.InventoryClient;
 import com.mazen.ecommerce.shop_service.dto.CartItemResponseDto;
 import com.mazen.ecommerce.shop_service.dto.CartResponseDto;
+import com.mazen.ecommerce.shop_service.dto.ProductResponseDto;
 import com.mazen.ecommerce.shop_service.exception.ProductNotFoundException;
 import com.mazen.ecommerce.shop_service.model.Cart;
 import com.mazen.ecommerce.shop_service.model.CartItem;
+import com.mazen.ecommerce.shop_service.model.Order;
+import com.mazen.ecommerce.shop_service.model.OrderItem;
+import com.mazen.ecommerce.shop_service.model.OrderStatus;
 import com.mazen.ecommerce.shop_service.repository.CartRepository;
+import com.mazen.ecommerce.shop_service.repository.OrderRepository;
 
 import feign.FeignException;
+import jakarta.transaction.Transactional;
 
 @Service
 public class CartService {
 
     private CartRepository cartRepository;
+    private final OrderRepository orderRepository;
     private final InventoryClient inventoryClient;
-    public CartService(CartRepository cartRepo, InventoryClient inventoryClient) {
+
+    public CartService(CartRepository cartRepo, OrderRepository orderRepo, InventoryClient inventoryClient) {
         this.cartRepository = cartRepo;
+        this.orderRepository = orderRepo;
         this.inventoryClient = inventoryClient;
     }
 
@@ -32,6 +44,7 @@ public class CartService {
                     Cart cart = new Cart();
                     cart.setUserId(userId);
                     cart.setCartItems(new ArrayList<>());
+                    cart.setTotalPrice(BigDecimal.ZERO);
                     return cartRepository.save(cart);
                 });
     }
@@ -42,8 +55,9 @@ public class CartService {
         } catch (FeignException.NotFound e) {
             throw new ProductNotFoundException("Product not found: " + productId);
         }
+        ResponseEntity<ProductResponseDto> productResponse = inventoryClient.getProduct(productId);
         Cart cart = getOrCreateCart(userId);
-
+        ProductResponseDto product = productResponse.getBody();
         Optional<CartItem> existingItem = cart.getCartItems().stream()
                 .filter(item -> item.getProductId().equals(productId))
                 .findFirst();
@@ -59,15 +73,23 @@ public class CartService {
             newItem.setProductId(productId);
             newItem.setQuantity(quantity);
             newItem.setCart(cart);
+            newItem.setPriceAtPurchase(product.getPrice());
             cart.getCartItems().add(newItem);
         }
-
+        cart.setTotalPrice(cart.getCartItems().stream()
+                .map(item -> item.getPriceAtPurchase().multiply(BigDecimal.valueOf(item.getQuantity())))
+                .reduce(BigDecimal.ZERO, BigDecimal::add));
+        cartRepository.save(cart);
         return toCartResponseDto(cartRepository.save(cart));
     }
 
     public CartResponseDto removeItemFromCart(Long userId, Long cartItemId) {
         Cart cart = getOrCreateCart(userId);
         cart.getCartItems().removeIf(item -> item.getCartItemId().equals(cartItemId));
+        cart.setTotalPrice(cart.getCartItems().stream()
+                .map(item -> item.getPriceAtPurchase().multiply(BigDecimal.valueOf(item.getQuantity())))
+                .reduce(BigDecimal.ZERO, BigDecimal::add));
+        cartRepository.save(cart);
         return toCartResponseDto(cartRepository.save(cart));
     }
 
@@ -78,6 +100,8 @@ public class CartService {
     public CartResponseDto clearCart(Long userId) {
         Cart cart = getOrCreateCart(userId);
         cart.getCartItems().clear();
+        cart.setTotalPrice(BigDecimal.ZERO);
+        cartRepository.save(cart);
         return toCartResponseDto(cartRepository.save(cart));
     }
 
@@ -110,8 +134,42 @@ public class CartService {
 
         // your code: set the new quantity on `item`
         item.setQuantity(newQuantity);
-
+        cart.setTotalPrice(cart.getCartItems().stream()
+                .map(i -> i.getPriceAtPurchase().multiply(BigDecimal.valueOf(i.getQuantity())))
+                .reduce(BigDecimal.ZERO, BigDecimal::add));
+        cartRepository.save(cart);
         return toCartResponseDto(cartRepository.save(cart));
+    }
+
+    private Order convertToOrder(Cart cart) {
+        Order order = new Order();
+        order.setUserId(cart.getUserId());
+        order.setStatus(OrderStatus.PENDING);
+        order.setOrderDate(new Date());
+        List<OrderItem> orderItems = new ArrayList<>();
+        BigDecimal totalPrice = BigDecimal.ZERO;
+        for (CartItem cartItem : cart.getCartItems()) {
+            OrderItem orderItem = new OrderItem();
+            orderItem.setProductId(cartItem.getProductId());
+            orderItem.setQuantity(cartItem.getQuantity());
+            orderItem.setPriceAtPurchase(cartItem.getPriceAtPurchase());
+            orderItems.add(orderItem);
+            totalPrice = totalPrice.add(cartItem.getPriceAtPurchase().multiply(BigDecimal.valueOf(cartItem.getQuantity())));
+        }
+        order.setOrderItems(orderItems);
+        order.setTotalPrice(totalPrice);
+        order.setStatus(OrderStatus.PENDING);
+        order.setOrderDate(new Date());
+        return order;
+    }
+    @Transactional
+    public Order getCheckoutCart(Long userId) {
+        Cart cart = getOrCreateCart(userId);
+        if (cart.getCartItems().isEmpty()) {
+            throw new RuntimeException("Cart is empty for user: " + userId);
+        }
+        Order order = convertToOrder(cart);
+        return order;
     }
 
 }

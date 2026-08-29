@@ -1,0 +1,1 @@
+ALTER TABLE cart_item ADD COLUMN price_at_purchase DECIMAL(19,2) DEFAULT 0.00;

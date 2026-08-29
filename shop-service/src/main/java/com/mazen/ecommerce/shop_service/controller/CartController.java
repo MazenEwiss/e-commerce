@@ -12,8 +12,10 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.mazen.ecommerce.shop_service.dto.AddCartItemRequestDto;
 import com.mazen.ecommerce.shop_service.dto.CartResponseDto;
+import com.mazen.ecommerce.shop_service.dto.OrderResponseDto;
 import com.mazen.ecommerce.shop_service.dto.UpdateQuantityDto;
 import com.mazen.ecommerce.shop_service.service.CartService;
+import com.mazen.ecommerce.shop_service.service.OrderService;
 import com.mazen.ecommerce.shop_service.util.AuthUtil;
 
 import jakarta.validation.Valid;
@@ -22,8 +24,10 @@ import jakarta.validation.Valid;
 @RequestMapping("/api/carts")
 public class CartController {
     private final CartService cartService;
-    public CartController(CartService cartService) {
+    private final OrderService orderService;
+    public CartController(CartService cartService, OrderService orderService) {
         this.cartService = cartService;
+        this.orderService = orderService;
     }
 
     @PostMapping("/mine/items")
@@ -59,6 +63,12 @@ public class CartController {
         Long userId = AuthUtil.getCurrentUserId();
         CartResponseDto updatedCart = cartService.updateItemQuantity(userId, cartItemId, quantity.getQuantity());
         return ResponseEntity.ok(updatedCart);
+    }
+    @PostMapping("/mine/checkout")
+    public ResponseEntity<OrderResponseDto> checkoutCart() {
+        Long userId = AuthUtil.getCurrentUserId();
+        OrderResponseDto orderResp = orderService.placeOrder(userId);
+        return ResponseEntity.ok(orderResp);
     }
 }
 
