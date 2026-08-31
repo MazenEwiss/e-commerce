@@ -1,0 +1,64 @@
+version: '3.8'
+
+services:
+  # 1. Eureka Server
+  eureka-server:
+    build: ./eureka-server
+    ports:
+      - "8761:8761"
+
+  # 2. SQL Databases
+  wallet-mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: root1234
+      MYSQL_DATABASE: wallet_db
+    ports:
+      - "3306:3306"
+
+  inventory-mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: root1234
+      MYSQL_DATABASE: inventory_db
+    ports:
+      - "3307:3306"
+
+  shop-mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: shop_db
+    ports:
+      - "3308:3306"
+  # 3. Microservices
+  wallet-service:
+    build: ./wallet-service
+    ports:
+      - "8080:8080"
+    depends_on:
+      - eureka-server
+      - wallet-mysql
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:mysql://wallet-mysql:3306/wallet_db
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
+  inventory-service:
+    build: ./inventory-service
+    ports:
+      - "8081:8081"
+    depends_on:
+      - eureka-server
+      - inventory-mysql
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:mysql://inventory-mysql:3306/inventory_db
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
+  shop-service:
+    build: ./shop-service
+    ports:
+      - "8082:8082"
+    depends_on:
+      - eureka-server
+      - shop-mysql
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:mysql://shop-mysql:3306/shop_db
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
