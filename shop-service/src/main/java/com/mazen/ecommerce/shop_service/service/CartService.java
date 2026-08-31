@@ -19,7 +19,9 @@ import com.mazen.ecommerce.shop_service.model.CartItem;
 import com.mazen.ecommerce.shop_service.model.Order;
 import com.mazen.ecommerce.shop_service.model.OrderItem;
 import com.mazen.ecommerce.shop_service.model.OrderStatus;
+import com.mazen.ecommerce.shop_service.repository.CartItemRepository;
 import com.mazen.ecommerce.shop_service.repository.CartRepository;
+import com.mazen.ecommerce.shop_service.repository.OrderItemRepository;
 import com.mazen.ecommerce.shop_service.repository.OrderRepository;
 
 import feign.FeignException;
@@ -27,15 +29,18 @@ import jakarta.transaction.Transactional;
 
 @Service
 public class CartService {
-
-    private CartRepository cartRepository;
-    private final OrderRepository orderRepository;
+    private final CartItemRepository cartItemRepository;
+    private final CartRepository cartRepository;
+    private final OrderItemRepository orderItemRepository;
     private final InventoryClient inventoryClient;
+    private final OrderRepository orderRepository;
 
-    public CartService(CartRepository cartRepo, OrderRepository orderRepo, InventoryClient inventoryClient) {
+    public CartService(CartRepository cartRepo, OrderRepository orderRepo, InventoryClient inventoryClient , CartItemRepository cartItemRepo, OrderItemRepository orderItemRepo ,OrderItemRepository orderItemRepository) {
         this.cartRepository = cartRepo;
-        this.orderRepository = orderRepo;
         this.inventoryClient = inventoryClient;
+        this.cartItemRepository = cartItemRepo;
+        this.orderItemRepository = orderItemRepository;
+        this.orderRepository = orderRepo;
     }
 
     private Cart getOrCreateCart(Long userId) {
@@ -75,6 +80,7 @@ public class CartService {
             newItem.setCart(cart);
             newItem.setPriceAtPurchase(product.getPrice());
             cart.getCartItems().add(newItem);
+            cartItemRepository.save(newItem);
         }
         cart.setTotalPrice(cart.getCartItems().stream()
                 .map(item -> item.getPriceAtPurchase().multiply(BigDecimal.valueOf(item.getQuantity())))
@@ -86,6 +92,9 @@ public class CartService {
     public CartResponseDto removeItemFromCart(Long userId, Long cartItemId) {
         Cart cart = getOrCreateCart(userId);
         cart.getCartItems().removeIf(item -> item.getCartItemId().equals(cartItemId));
+        CartItem itemToRemove = cartItemRepository.findById(cartItemId)
+                .orElseThrow(() -> new RuntimeException("Cart item not found: " + cartItemId));
+        cartItemRepository.delete(itemToRemove);
         cart.setTotalPrice(cart.getCartItems().stream()
                 .map(item -> item.getPriceAtPurchase().multiply(BigDecimal.valueOf(item.getQuantity())))
                 .reduce(BigDecimal.ZERO, BigDecimal::add));
@@ -116,11 +125,12 @@ public class CartService {
                     itemDto.setCartItemId(item.getCartItemId());
                     itemDto.setProductId(item.getProductId());
                     itemDto.setQuantity(item.getQuantity());
+                    itemDto.setPriceAtPurchase(item.getPriceAtPurchase());
                     return itemDto;
                 })
                 .toList();
         dto.setCartItems(itemDtos);
-
+        dto.setTotalPrice(cart.getTotalPrice());
         return dto;
     }
 
@@ -133,19 +143,22 @@ public class CartService {
                 .orElseThrow(() -> new RuntimeException("Cart item not found: " + cartItemId));
 
         // your code: set the new quantity on `item`
-        item.setQuantity(newQuantity);
+        int quantity =newQuantity ;
+        item.setQuantity(quantity);
         cart.setTotalPrice(cart.getCartItems().stream()
                 .map(i -> i.getPriceAtPurchase().multiply(BigDecimal.valueOf(i.getQuantity())))
                 .reduce(BigDecimal.ZERO, BigDecimal::add));
+        
         cartRepository.save(cart);
         return toCartResponseDto(cartRepository.save(cart));
-    }
+    } 
 
     private Order convertToOrder(Cart cart) {
         Order order = new Order();
         order.setUserId(cart.getUserId());
         order.setStatus(OrderStatus.PENDING);
         order.setOrderDate(new Date());
+        order.setTotalPrice(cart.getTotalPrice());
         List<OrderItem> orderItems = new ArrayList<>();
         BigDecimal totalPrice = BigDecimal.ZERO;
         for (CartItem cartItem : cart.getCartItems()) {
@@ -154,12 +167,14 @@ public class CartService {
             orderItem.setQuantity(cartItem.getQuantity());
             orderItem.setPriceAtPurchase(cartItem.getPriceAtPurchase());
             orderItems.add(orderItem);
+            orderItem.setOrder(order);
             totalPrice = totalPrice.add(cartItem.getPriceAtPurchase().multiply(BigDecimal.valueOf(cartItem.getQuantity())));
         }
         order.setOrderItems(orderItems);
         order.setTotalPrice(totalPrice);
         order.setStatus(OrderStatus.PENDING);
         order.setOrderDate(new Date());
+        orderRepository.save(order);
         return order;
     }
     @Transactional

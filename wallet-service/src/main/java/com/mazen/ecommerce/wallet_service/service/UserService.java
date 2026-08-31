@@ -78,6 +78,7 @@ public class UserService {
         if (userRequestDto.getWalletId() != null) {
             throw new IllegalArgumentException("Cannot change wallet ID");
         }
+        userRepository.save(user);
         return new UserResponseDto(user.getId(), user.getFirstName(), user.getLastName(), user.getUserName(), user.getEmail(), user.getWallet() != null ? user.getWallet().getWalletId() : null);
     }
 

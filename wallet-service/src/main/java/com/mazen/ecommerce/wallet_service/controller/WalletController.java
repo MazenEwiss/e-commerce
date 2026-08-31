@@ -8,12 +8,12 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.mazen.ecommerce.wallet_service.dto.LoginRequestDto;
 import com.mazen.ecommerce.wallet_service.dto.SignupRequestDto;
 import com.mazen.ecommerce.wallet_service.dto.TokenResponseDto;
+import com.mazen.ecommerce.wallet_service.dto.TransactionRequestDto;
 import com.mazen.ecommerce.wallet_service.model.Transaction;
 import com.mazen.ecommerce.wallet_service.service.UserService;
 import com.mazen.ecommerce.wallet_service.service.WalletService;
@@ -32,13 +32,18 @@ public class WalletController {
     }
 
     @PostMapping("/deposit/mine")
-    public ResponseEntity<Transaction> depositToWallet(@RequestParam BigDecimal amount) {
+    public ResponseEntity<Transaction> depositToWallet(@RequestBody TransactionRequestDto transferRequest) {
+        BigDecimal amount = transferRequest.getAmount();
+        if (amount.compareTo(BigDecimal.ZERO) <= 0) {
+            return ResponseEntity.badRequest().build();
+        }
         Transaction transaction = walletService.depositToWallet(AuthUtil.getCurrentUserId(), amount);
         return ResponseEntity.ok(transaction);
     }
 
     @PostMapping("/withdraw/mine")
-    public ResponseEntity<Transaction> withdrawFromWallet(@RequestParam BigDecimal amount) {
+    public ResponseEntity<Transaction> withdrawFromWallet(@RequestBody TransactionRequestDto transferRequest) {
+        BigDecimal amount = transferRequest.getAmount();
         if (amount.compareTo(BigDecimal.ZERO) <= 0) {
             return ResponseEntity.badRequest().build();
         }
@@ -47,8 +52,9 @@ public class WalletController {
     }
 
     @PostMapping("/transfer")
-    public ResponseEntity<List<Transaction>> transferBetweenWallets(@RequestParam Long toUserId,
-            @RequestParam BigDecimal amount) {
+    public ResponseEntity<List<Transaction>> transferBetweenWallets(@RequestBody TransactionRequestDto transferRequest ) {
+        BigDecimal amount = transferRequest.getAmount();
+        Long toUserId = transferRequest.getToUserId();
         if (amount.compareTo(BigDecimal.ZERO) <= 0) {
             return ResponseEntity.badRequest().build();
         }

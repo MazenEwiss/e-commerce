@@ -21,7 +21,9 @@ import com.mazen.ecommerce.shop_service.model.OrderItem;
 import com.mazen.ecommerce.shop_service.model.OrderStatus;
 import com.mazen.ecommerce.shop_service.model.Payment;
 import com.mazen.ecommerce.shop_service.model.PaymentStatus;
+import com.mazen.ecommerce.shop_service.repository.CartItemRepository;
 import com.mazen.ecommerce.shop_service.repository.CartRepository;
+import com.mazen.ecommerce.shop_service.repository.OrderItemRepository;
 import com.mazen.ecommerce.shop_service.repository.OrderRepository;
 
 import feign.FeignException;
@@ -35,13 +37,16 @@ public class OrderService {
     private final InventoryClient inventoryClient;
     private final CartRepository cartRepository;
     private final CartService cartService;
-
-    public OrderService(OrderRepository orderRepository, CartRepository cartRepository, CartService cartService, PaymentService paymentService, InventoryClient inventoryClient) {
+    private final OrderItemRepository orderItemRepository;
+    private final CartItemRepository cartItemRepository  ;
+    public OrderService(OrderRepository orderRepository, OrderItemRepository orderItemRepository, CartRepository cartRepository, CartService cartService, PaymentService paymentService, InventoryClient inventoryClient, CartItemRepository cartItemRepository) {
         this.orderRepository = orderRepository;
         this.paymentService = paymentService;
         this.inventoryClient = inventoryClient;
         this.cartRepository = cartRepository;
         this.cartService = cartService;
+        this.orderItemRepository = orderItemRepository;
+        this.cartItemRepository = cartItemRepository;
     }
 
     private OrderResponseDto toOrderResponseDto(Order saved) {
@@ -70,8 +75,14 @@ public class OrderService {
     public OrderResponseDto placeOrder(Long userId) {
 
         Order order = cartService.getCheckoutCart(userId);
+        if (order == null) {
+            throw new RuntimeException("No items in cart for user: " + userId);
+        }
         Cart cart = cartRepository.findByUserId(userId)
                 .orElseThrow(() -> new RuntimeException("Cart not found for user: " + userId));
+        if (cart.getCartItems().isEmpty()) {
+            throw new RuntimeException("Cart is empty for user: " + userId);
+        }
         List<OrderItem> orderItems = new ArrayList<>();
         // Tracks items successfully reserved so far, so we can compensate (restock) if a later item fails
         List<OrderItemRequestDto> reservedItems = new ArrayList<>();
@@ -81,6 +92,8 @@ public class OrderService {
                 ResponseEntity<ProductResponseDto> productResponse = inventoryClient.getProduct(item.getProductId());
                 ProductResponseDto product = productResponse.getBody();
                 if (product.getQuantity() < item.getQuantity()) {
+                    order.setStatus(OrderStatus.FAILED);
+                    order.setTotalPrice(cart.getTotalPrice());
                     throw new OrderPlacementFailedException("Insufficient stock for product: " + item.getProductId());
                 }
                 // Reserve the stock

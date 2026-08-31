@@ -1,9 +1,12 @@
 package com.mazen.ecommerce.shop_service.dto;
 
+import java.math.BigDecimal;
+
 public class CartItemResponseDto {
     private Long cartItemId;
     private Long productId;
     private Integer quantity;
+    private BigDecimal priceAtPurchase;
 
     public Long getCartItemId() {
         return cartItemId;
@@ -27,5 +30,13 @@ public class CartItemResponseDto {
 
     public void setQuantity(Integer quantity) {
         this.quantity = quantity;
+    }
+
+    public BigDecimal getPriceAtPurchase() {
+        return priceAtPurchase;
+    }
+
+    public void setPriceAtPurchase(BigDecimal priceAtPurchase) {
+        this.priceAtPurchase = priceAtPurchase;
     }
 }
