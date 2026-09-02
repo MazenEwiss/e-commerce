@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.mazen.ecommerce.shop_service.dto.AddCartItemRequestDto;
 import com.mazen.ecommerce.shop_service.dto.CartResponseDto;
+import com.mazen.ecommerce.shop_service.dto.CheckoutRequestDto;
 import com.mazen.ecommerce.shop_service.dto.OrderResponseDto;
 import com.mazen.ecommerce.shop_service.dto.UpdateQuantityDto;
 import com.mazen.ecommerce.shop_service.service.CartService;
@@ -65,9 +66,9 @@ public class CartController {
         return ResponseEntity.ok(updatedCart);
     }
     @PostMapping("/checkout")
-    public ResponseEntity<OrderResponseDto> checkoutCart() {
+    public ResponseEntity<OrderResponseDto> checkoutCart(@Valid @RequestBody CheckoutRequestDto checkoutRequestDto) {
         Long userId = AuthUtil.getCurrentUserId();
-        OrderResponseDto orderResp = orderService.placeOrder(userId);
+        OrderResponseDto orderResp = orderService.placeOrder(userId, checkoutRequestDto.getWalletId());
         return ResponseEntity.ok(orderResp);
     }
 }

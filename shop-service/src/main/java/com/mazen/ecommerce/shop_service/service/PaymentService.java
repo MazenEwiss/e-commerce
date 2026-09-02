@@ -23,7 +23,7 @@ public class PaymentService {
     }
 
     @Transactional
-    public Payment processPayment(Order order) {
+    public Payment processPayment(Order order, Long walletId) {
         // Simulate payment processing logic
         Payment payment = new Payment();
         payment.setOrder(order);
@@ -31,6 +31,7 @@ public class PaymentService {
         payment.setAmount(order.getTotalPrice());
         TransactionRequestDto request = new TransactionRequestDto();
         request.setAmount(order.getTotalPrice());
+        request.setWalletId(walletId);
         try {
             var response = walletClient.withdraw(request);
             if (response.getBody() != null) {

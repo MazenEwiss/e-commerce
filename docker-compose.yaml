@@ -70,7 +70,7 @@ services:
   inventory-service:
     build: ./inventory-service
     ports:
-      - "8081:8081"
+      - "8082:8082"
     depends_on:
       eureka-server:
         condition: service_started
@@ -85,7 +85,7 @@ services:
   shop-service:
     build: ./shop-service
     ports:
-      - "8082:8082"
+      - "8081:8081"
     depends_on:
       eureka-server:
         condition: service_started

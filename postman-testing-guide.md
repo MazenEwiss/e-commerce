@@ -108,12 +108,12 @@ Expected: 200, Transaction (DEPOSIT, COMPLETED) against that specific wallet. Tr
 ```
 Expected: 200. Try `"amount": 999999` too → expect 400 insufficient balance.
 
-### 3.3 Transfer ⚠️
+### 3.3 Transfer 
 **POST** `http://localhost:8080/wallet/transfer` — Auth required.
 ```json
 { "walletId": 1, "toWalletId": 2, "toUserId": 2, "amount": 50 }
 ```
-Expected: 200, two Transaction rows (PAYMENT, one per wallet). `TransactionRequestDto` carries both `toWalletId` and `toUserId` — send both the first time and check the response/DB to see which one the service actually used to resolve the destination wallet, then simplify your test payload accordingly.
+Expected: 200, two Transaction rows (PAYMENT, one per wallet).
 
 ### 3.4 Transaction history
 **GET** `http://localhost:8080/wallet/transactions` — Auth required.
@@ -178,14 +178,6 @@ This previously failed (path variable was typed as the `Category` entity, never 
 ```
 Expected: 200, only price changes.
 
-### 5.5 Purchase product
-**POST** `http://localhost:8082/products/{productId}/purchase/5` — Auth required, no body.
-Expected: 200, quantity decremented by 5.
-
-### 5.6 Restock product
-**POST** `http://localhost:8082/products/{productId}/restock/5` — Auth required, no body.
-Expected: 200, quantity incremented by 5.
-
 ### 5.7 Delete product
 **DELETE** `http://localhost:8082/products/{productId}` — Auth required.
 Expected: 204. Use a spare product — not one you'll add to cart below.
@@ -227,7 +219,10 @@ Expected: 200/204, cart emptied.
 Checkout reads directly from your persisted Cart — no request body. Add items to cart (section 6) before running this.
 
 ### 7.1 Checkout (place order from cart)
-**POST** `http://localhost:8081/api/carts/checkout` — Auth required, no body.
+**POST** `http://localhost:8081/api/carts/checkout` — Auth required.
+```json
+{ "walletId": 3 }
+```
 Expected: 201, order with status `PROCESSING` (happy path — stock reserved, wallet deducted). Confirm your cart is now empty (`GET /api/carts`) and the product's stock actually decreased (`GET /products/{id}` on inventory-service).
 Also test: add an item costing more than your wallet balance, checkout again → expect the order created with `PAYMENT_FAILED`, and stock correctly restored (compare product quantity before/after).
 

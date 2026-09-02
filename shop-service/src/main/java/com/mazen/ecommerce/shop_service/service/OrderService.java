@@ -72,7 +72,7 @@ public class OrderService {
     }
 
     @Transactional
-    public OrderResponseDto placeOrder(Long userId) {
+    public OrderResponseDto placeOrder(Long userId, Long walletId) {
 
         Order order = cartService.getCheckoutCart(userId);
         if (order == null) {
@@ -122,7 +122,7 @@ public class OrderService {
         order.setTotalPrice(totalPrice);
 
         Order saved = orderRepository.save(order);
-        Payment payment = paymentService.processPayment(saved);
+        Payment payment = paymentService.processPayment(saved, walletId);
         saved.setPayment(payment);
 
         if (payment.getPaymentStatus() == PaymentStatus.SUCCESS) {
