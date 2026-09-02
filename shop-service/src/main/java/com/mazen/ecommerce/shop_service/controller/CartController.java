@@ -30,41 +30,41 @@ public class CartController {
         this.orderService = orderService;
     }
 
-    @PostMapping("/mine/items")
+    @PostMapping("/items")
     public ResponseEntity<CartResponseDto> addItem(@Valid @RequestBody AddCartItemRequestDto requestDto) {
         Long userId = AuthUtil.getCurrentUserId();
         CartResponseDto updatedCart = cartService.addItemToCart(userId, requestDto.getProductId(), requestDto.getQuantity());
         return ResponseEntity.ok(updatedCart);
     }
 
-    @DeleteMapping("/mine/items/{cartItemId}")
+    @DeleteMapping("/items/{cartItemId}")
     public ResponseEntity<CartResponseDto> removeItemFromCart(@PathVariable Long cartItemId) {
         Long userId = AuthUtil.getCurrentUserId();
         CartResponseDto updatedCart = cartService.removeItemFromCart(userId, cartItemId);
         return ResponseEntity.ok(updatedCart);
     }
 
-    @GetMapping("/mine")
+    @GetMapping
     public ResponseEntity<CartResponseDto> getCart() {
         Long userId = AuthUtil.getCurrentUserId();
         CartResponseDto cart = cartService.getCart(userId);
         return ResponseEntity.ok(cart);
     }
 
-    @DeleteMapping("/mine")
+    @DeleteMapping
     public ResponseEntity<CartResponseDto> clearCart() {
         Long userId = AuthUtil.getCurrentUserId();
         CartResponseDto updatedCart = cartService.clearCart(userId);
         return ResponseEntity.ok(updatedCart);
     }
 
-    @PutMapping("/mine/items/{cartItemId}")
+    @PutMapping("/items/{cartItemId}")
     public ResponseEntity<CartResponseDto> updateItemQuantity(@PathVariable Long cartItemId,@Valid @RequestBody UpdateQuantityDto quantity) {
         Long userId = AuthUtil.getCurrentUserId();
         CartResponseDto updatedCart = cartService.updateItemQuantity(userId, cartItemId, quantity.getQuantity());
         return ResponseEntity.ok(updatedCart);
     }
-    @PostMapping("/mine/checkout")
+    @PostMapping("/checkout")
     public ResponseEntity<OrderResponseDto> checkoutCart() {
         Long userId = AuthUtil.getCurrentUserId();
         OrderResponseDto orderResp = orderService.placeOrder(userId);

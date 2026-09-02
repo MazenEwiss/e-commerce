@@ -11,6 +11,6 @@ import com.mazen.ecommerce.shop_service.dto.TransactionResponseDto;
 @FeignClient(name = "wallet-service")
 public interface WalletClient {
 
-    @PostMapping("/wallet/withdraw/mine")
+    @PostMapping("/wallet/withdraw")
     ResponseEntity<TransactionResponseDto> withdraw(@RequestBody TransactionRequestDto request);
 }

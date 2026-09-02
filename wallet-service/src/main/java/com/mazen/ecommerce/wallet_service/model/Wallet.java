@@ -7,8 +7,9 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
-import jakarta.persistence.OneToOne;
+import jakarta.persistence.ManyToOne;
 import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
 @Entity
@@ -16,8 +17,9 @@ public class Wallet {
     @Id
     @GeneratedValue( strategy = GenerationType.IDENTITY )
     private Long walletId;
-
-    @OneToOne
+    @NotBlank
+    private String walletName;
+    @ManyToOne
     @JoinColumn(name = "user_id", referencedColumnName = "id")
     private User user;
 
@@ -61,5 +63,13 @@ public class Wallet {
     public String toString() {
         return "Wallet [walletId=" + walletId + ", user=" + user + ", balance=" + balance + "]";
     }   
+
+    public String getWalletName() {
+        return walletName;
+    }
+
+    public void setWalletName(String walletName) {
+        this.walletName = walletName;
+    }
 
 }

@@ -30,7 +30,7 @@ public class OrderController {
         return ResponseEntity.ok(orderService.getOrderById(id));
     }
 
-    @GetMapping("/mine")
+    @GetMapping
     public ResponseEntity<List<OrderResponseDto>> getMyOrders() {
         Long userId = AuthUtil.getCurrentUserId();
         return ResponseEntity.ok(orderService.getOrdersByUserId(userId));

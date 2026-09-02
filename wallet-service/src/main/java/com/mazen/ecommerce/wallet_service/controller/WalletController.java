@@ -19,6 +19,8 @@ import com.mazen.ecommerce.wallet_service.service.UserService;
 import com.mazen.ecommerce.wallet_service.service.WalletService;
 import com.mazen.ecommerce.wallet_service.util.AuthUtil;
 
+import jakarta.validation.Valid;
+
 @RestController
 @RequestMapping("/wallet")
 public class WalletController {
@@ -31,46 +33,40 @@ public class WalletController {
         this.userService = userService;
     }
 
-    @PostMapping("/deposit/mine")
-    public ResponseEntity<Transaction> depositToWallet(@RequestBody TransactionRequestDto transferRequest) {
+    @PostMapping("/deposit")
+    public ResponseEntity<Transaction> depositToWallet(@Valid@RequestBody TransactionRequestDto transferRequest) {
         BigDecimal amount = transferRequest.getAmount();
         if (amount.compareTo(BigDecimal.ZERO) <= 0) {
             return ResponseEntity.badRequest().build();
         }
-        Transaction transaction = walletService.depositToWallet(AuthUtil.getCurrentUserId(), amount);
+        Transaction transaction = walletService.depositToWallet(transferRequest);
         return ResponseEntity.ok(transaction);
     }
 
-    @PostMapping("/withdraw/mine")
-    public ResponseEntity<Transaction> withdrawFromWallet(@RequestBody TransactionRequestDto transferRequest) {
+    @PostMapping("/withdraw")
+    public ResponseEntity<Transaction> withdrawFromWallet(@Valid @RequestBody TransactionRequestDto transferRequest) {
         BigDecimal amount = transferRequest.getAmount();
         if (amount.compareTo(BigDecimal.ZERO) <= 0) {
             return ResponseEntity.badRequest().build();
         }
-        Transaction transaction = walletService.withdrawFromWallet(AuthUtil.getCurrentUserId(), amount);
+        Transaction transaction = walletService.withdrawFromWallet(transferRequest);
         return ResponseEntity.ok(transaction);
     }
 
     @PostMapping("/transfer")
-    public ResponseEntity<List<Transaction>> transferBetweenWallets(@RequestBody TransactionRequestDto transferRequest ) {
-        BigDecimal amount = transferRequest.getAmount();
-        Long toUserId = transferRequest.getToUserId();
-        if (amount.compareTo(BigDecimal.ZERO) <= 0) {
-            return ResponseEntity.badRequest().build();
-        }
-        Long fromUserId = AuthUtil.getCurrentUserId();
-        List<Transaction> transaction = walletService.transferBetweenWallets(fromUserId, toUserId, amount);
+    public ResponseEntity<List<Transaction>> transferBetweenWallets(@Valid @RequestBody TransactionRequestDto transferRequest ) {
+        List<Transaction> transaction = walletService.transferBetweenWallets(transferRequest);
         return ResponseEntity.ok(transaction);
     }
 
-    @GetMapping("/transactions/mine")
+    @GetMapping("/transactions")
     public ResponseEntity<List<Transaction>> getTransactionHistory() {
         List<Transaction> transactions = walletService.getTransactionHistory(AuthUtil.getCurrentUserId());
         return ResponseEntity.ok(transactions);
     }
 
     @PostMapping("/auth/signup")
-    public ResponseEntity<String> signup(@RequestBody SignupRequestDto signupRequest) {
+    public ResponseEntity<String> signup(@Valid @RequestBody SignupRequestDto signupRequest) {
         // Implement user signup logic here
         userService.createUser(
                 signupRequest.getUserName(),
@@ -84,7 +80,7 @@ public class WalletController {
     }
 
     @PostMapping("/auth/login")
-    public ResponseEntity<TokenResponseDto> login(@RequestBody LoginRequestDto loginRequest) {
+    public ResponseEntity<TokenResponseDto> login(@Valid @RequestBody LoginRequestDto loginRequest) {
         // Implement user login logic here
         String token = userService.authenticateUser(loginRequest.getUserName(), loginRequest.getPassword());
         return ResponseEntity.ok(new TokenResponseDto(token));

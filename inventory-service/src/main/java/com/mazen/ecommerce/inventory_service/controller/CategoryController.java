@@ -51,5 +51,6 @@ public class CategoryController {
     public ResponseEntity<List<CategoryResponseDto>> getAllCategories() {
         return ResponseEntity.ok().body(categoryService.getAllCategories());
     }
+    
 
 }

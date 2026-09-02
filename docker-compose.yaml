@@ -8,6 +8,8 @@ services:
   # 2. SQL Databases
   wallet-mysql:
     image: mysql:8.0
+    volumes:
+      - wallet-mysql-data:/var/lib/mysql
     environment:
       MYSQL_ROOT_PASSWORD: root1234
       MYSQL_DATABASE: wallet_db
@@ -21,6 +23,8 @@ services:
 
   inventory-mysql:
     image: mysql:8.0
+    volumes:
+      - inventory-mysql-data:/var/lib/mysql
     environment:
       MYSQL_ROOT_PASSWORD: root1234
       MYSQL_DATABASE: inventory_db
@@ -34,6 +38,8 @@ services:
 
   shop-mysql:
     image: mysql:8.0
+    volumes:
+      - shop-mysql-data:/var/lib/mysql
     environment:
       MYSQL_ROOT_PASSWORD: root
       MYSQL_DATABASE: shop_db
@@ -90,3 +96,7 @@ services:
       - SPRING_DATASOURCE_USERNAME=root
       - SPRING_DATASOURCE_PASSWORD=root
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
+volumes:
+  wallet-mysql-data:
+  inventory-mysql-data:
+  shop-mysql-data:

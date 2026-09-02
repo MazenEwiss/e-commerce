@@ -1,5 +1,7 @@
 package com.mazen.ecommerce.wallet_service.dto;
 
+import java.util.List;
+
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import jakarta.validation.constraints.NotBlank;
@@ -16,7 +18,7 @@ public class UserRequestDto {
     @NotBlank
     @JsonIgnore
     private String password;
-    private Long walletId;
+    private List<Long> walletId;
 
     public String getFirstName() {
         return firstName;
@@ -48,10 +50,10 @@ public class UserRequestDto {
     public void setPassword(String password) {
         this.password = password;
     }
-    public Long getWalletId() {
+    public List<Long> getWalletId() {
         return walletId;
     }
-    public void setWalletId(Long walletId) {
+    public void setWalletId(List<Long> walletId) {
         this.walletId = walletId;
     }
     @Override

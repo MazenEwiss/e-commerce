@@ -1,13 +1,18 @@
 package com.mazen.ecommerce.wallet_service.model;
 
+import java.util.List;
+
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
+import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.OneToOne;
+import jakarta.persistence.OneToMany;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 
@@ -17,6 +22,10 @@ public class User {
     private Long id;
     @NotBlank
     private String firstName;
+    @Enumerated(EnumType.STRING)
+    private UserRole role=UserRole.USER;
+    @Enumerated(EnumType.STRING)
+    private AccountStatus accountStatus = AccountStatus.PENDING;
     @NotBlank
     private String lastName;
     @NotBlank
@@ -28,9 +37,9 @@ public class User {
     @NotBlank
     @JsonIgnore
     private String password;
-    @OneToOne(mappedBy = "user")
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     @JsonIgnore
-    private Wallet wallet;
+    private List<Wallet> wallets;
 
     public Long getId() {
         return id;
@@ -76,12 +85,28 @@ public class User {
     public void setUserName(String userName) {
         this.userName = userName;
     }
-
-    public Wallet getWallet() {
-        return wallet;
+    
+    public UserRole getRole() {
+        return role;
     }
 
-    public void setWallet(Wallet wallet) {
-        this.wallet = wallet;
+    public void setRole(UserRole role) {
+        this.role = role;
+    }
+
+    public AccountStatus getAccountStatus() {
+        return accountStatus;
+    }
+
+    public void setAccountStatus(AccountStatus accountStatus) {
+        this.accountStatus = accountStatus;
+    }
+
+    public List<Wallet> getWallets() {
+        return wallets;
+    }
+
+    public void setWallets(List<Wallet> wallets) {
+        this.wallets = wallets;
     }
 }
