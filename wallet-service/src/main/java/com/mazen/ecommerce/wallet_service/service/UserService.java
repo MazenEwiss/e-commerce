@@ -93,12 +93,18 @@ public class UserService {
             user.setLastName(userRequestDto.getLastName());
         }
         if (userRequestDto.getEmail() != null) {
+            if (userRepository.existsByEmail(userRequestDto.getEmail()) && !user.getEmail().equals(userRequestDto.getEmail())) {
+                throw new IllegalArgumentException("Email already exists");
+            }
             user.setEmail(userRequestDto.getEmail());
         }
         if (userRequestDto.getPassword() != null) {
             user.setPassword(passwordEncoder.encode(userRequestDto.getPassword()));
         }
         if (userRequestDto.getUserName() != null) {
+            if (userRepository.existsByUserName(userRequestDto.getUserName()) && !user.getUserName().equals(userRequestDto.getUserName())) {
+                throw new IllegalArgumentException("Username already exists");
+            }
             user.setUserName(userRequestDto.getUserName());
         }
         if (userRequestDto.getWalletId() != null) {
@@ -178,5 +184,25 @@ public class UserService {
         targetUser.setAccountStatus(requestDto.getAccountStatus());
         return convertToUserResponseDto(userRepository.save(targetUser));
     }
-
+    public UserResponseDto removeWalletFromUser(Long userId, Long walletId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new UserNotFoundException("User not found"));
+        Wallet wallet = walletRepository.findById(walletId)
+                .orElseThrow(() -> new IllegalArgumentException("Wallet not found"));
+        if (!user.getWallets().contains(wallet)) {
+            throw new IllegalArgumentException("Wallet does not belong to the user");
+        }
+        if (wallet.getBalance().compareTo(java.math.BigDecimal.ZERO) > 0) {
+            throw new IllegalArgumentException("Cannot remove wallet with non-zero balance");
+        }
+        List<Transaction> transactions = transactionRepository
+                .findByWallet_WalletIdOrderByTimestampDesc(wallet.getWalletId());
+        if (transactions != null && !transactions.isEmpty()) {
+            throw new IllegalArgumentException("Cannot remove wallet with existing transactions");
+        }
+        user.getWallets().remove(wallet);
+        wallet.setUser(null); // break the association first
+        walletRepository.delete(wallet);
+        return convertToUserResponseDto(userRepository.save(user));
+    }
 }

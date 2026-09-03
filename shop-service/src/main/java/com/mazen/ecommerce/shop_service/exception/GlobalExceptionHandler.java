@@ -24,6 +24,26 @@ public class GlobalExceptionHandler {
     public ResponseEntity<String> handleOrderNotCancellable(OrderNotCancellableException ex) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ex.getMessage());
     }
+    @ExceptionHandler(InsufficentStockException.class)
+    public ResponseEntity<String> handleInsufficentStock(InsufficentStockException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ex.getMessage());
+    }
+    @ExceptionHandler(CartItemNotFoundException.class)
+    public ResponseEntity<String> handleCartItemNotFound(CartItemNotFoundException ex)  {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ex.getMessage());
+    }
+    @ExceptionHandler(CartEmptyException.class)
+    public ResponseEntity<String> handleCartEmpty(CartEmptyException ex)  {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ex.getMessage());
+    }
+    @ExceptionHandler(CartNotFoundException.class)
+    public ResponseEntity<String> handleCartNotFound(CartNotFoundException ex)  {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ex.getMessage());
+    }
+    @ExceptionHandler(UserAuthorizationException.class)
+    public ResponseEntity<String> handleUserAuthorization(UserAuthorizationException ex)  {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ex.getMessage());
+    }
 }
 
 

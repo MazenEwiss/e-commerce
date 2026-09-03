@@ -1,27 +1,29 @@
 package com.mazen.ecommerce.shop_service.dto;
 
+import java.util.List;
+
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 
 public class AddCartItemRequestDto {
     @NotNull
-    private Long productId;
-    @NotNull @Min(1)
-    private Integer quantity;
+    private List<Long> productIds;
+    @NotNull 
+    private List< @Min(1) Integer> quantities;
 
-    public Long getProductId() {
-        return productId;
+    public List<Long> getProductIds() {
+        return productIds;
     }
 
-    public void setProductId(Long productId) {
-        this.productId = productId;
+    public void setProductIds(List<Long> productIds) {
+        this.productIds = productIds;
     }
 
-    public Integer getQuantity() {
-        return quantity;
+    public List<Integer> getQuantities() {
+        return quantities;
     }
 
-    public void setQuantity(Integer quantity) {
-        this.quantity = quantity;
+    public void setQuantities(List<Integer> quantities) {
+        this.quantities = quantities;
     }
 }

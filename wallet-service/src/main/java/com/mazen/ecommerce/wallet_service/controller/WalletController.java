@@ -5,6 +5,7 @@ import java.util.List;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -84,5 +85,10 @@ public class WalletController {
         // Implement user login logic here
         String token = userService.authenticateUser(loginRequest.getUserName(), loginRequest.getPassword());
         return ResponseEntity.ok(new TokenResponseDto(token));
+    }
+    @GetMapping("/balance/{walletId}")
+    public ResponseEntity<BigDecimal> getWalletBalance(@PathVariable Long walletId) {
+        BigDecimal balance = walletService.getWalletBalance(walletId);
+        return ResponseEntity.ok(balance);
     }
 }

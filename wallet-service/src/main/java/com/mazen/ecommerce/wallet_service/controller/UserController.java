@@ -1,5 +1,7 @@
 package com.mazen.ecommerce.wallet_service.controller;
 
+import java.util.List;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -73,5 +75,16 @@ public class UserController {
         walletRequestDto.setWalletId(walletId);
         WalletResponseDto updatedWallet = walletService.updateWallet(currentUserId, walletRequestDto);
         return ResponseEntity.ok(updatedWallet);
+    }
+    @PatchMapping("/users/remove-wallet/{walletId}")
+    public ResponseEntity<UserResponseDto> removeWalletFromCurrentUser(@PathVariable Long walletId) {
+        Long currentUserId = AuthUtil.getCurrentUserId();
+        UserResponseDto updatedUser = userService.removeWalletFromUser(currentUserId, walletId);
+        return ResponseEntity.ok(updatedUser);
+    }
+    @GetMapping("/users/all")
+    public ResponseEntity<List<UserResponseDto>> getAllUsers() {
+        List<UserResponseDto> users = userService.getAllUsers(AuthUtil.getCurrentUserId());
+        return ResponseEntity.ok(users);
     }
 }

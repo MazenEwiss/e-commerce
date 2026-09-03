@@ -13,6 +13,9 @@ import com.mazen.ecommerce.shop_service.client.InventoryClient;
 import com.mazen.ecommerce.shop_service.dto.CartItemResponseDto;
 import com.mazen.ecommerce.shop_service.dto.CartResponseDto;
 import com.mazen.ecommerce.shop_service.dto.ProductResponseDto;
+import com.mazen.ecommerce.shop_service.exception.CartEmptyException;
+import com.mazen.ecommerce.shop_service.exception.CartItemNotFoundException;
+import com.mazen.ecommerce.shop_service.exception.InsufficentStockException;
 import com.mazen.ecommerce.shop_service.exception.ProductNotFoundException;
 import com.mazen.ecommerce.shop_service.model.Cart;
 import com.mazen.ecommerce.shop_service.model.CartItem;
@@ -54,12 +57,28 @@ public class CartService {
                 });
     }
 
-    public CartResponseDto addItemToCart(Long userId, Long productId, int quantity) {
-        try {
-            inventoryClient.getProduct(productId);
-        } catch (FeignException.NotFound e) {
-            throw new ProductNotFoundException("Product not found: " + productId);
+    public CartResponseDto addItemToCart(Long userId, List<Long> productIds, List<Integer> quantities) {
+        for (int i = 0; i < productIds.size(); i++) {
+            Long productId = productIds.get(i);
+            Integer quantity = quantities.get(i);
+            try {
+                inventoryClient.getProduct(productId);
+            } catch (FeignException.NotFound e) {
+                throw new ProductNotFoundException("Product not found: " + productId);
+            }
         }
+        for (int i = 0; i < productIds.size(); i++) {
+            Long productId = productIds.get(i);
+            Integer quantity = quantities.get(i);
+            ProductResponseDto productResponse = inventoryClient.getProduct(productId).getBody();
+            if( productResponse.getQuantity() < quantity) {
+                throw new InsufficentStockException("Insufficient stock for product: " + productId);
+            }
+            addOrUpdateCartItem(userId, productId, quantity);
+        }
+        return toCartResponseDto(getOrCreateCart(userId));
+    }
+    private CartResponseDto addOrUpdateCartItem(Long userId, Long productId, Integer quantity) {
         ResponseEntity<ProductResponseDto> productResponse = inventoryClient.getProduct(productId);
         Cart cart = getOrCreateCart(userId);
         ProductResponseDto product = productResponse.getBody();
@@ -93,7 +112,7 @@ public class CartService {
         Cart cart = getOrCreateCart(userId);
         cart.getCartItems().removeIf(item -> item.getCartItemId().equals(cartItemId));
         CartItem itemToRemove = cartItemRepository.findById(cartItemId)
-                .orElseThrow(() -> new RuntimeException("Cart item not found: " + cartItemId));
+                .orElseThrow(() -> new CartItemNotFoundException("Cart item not found: " + cartItemId));
         cartItemRepository.delete(itemToRemove);
         cart.setTotalPrice(cart.getCartItems().stream()
                 .map(item -> item.getPriceAtPurchase().multiply(BigDecimal.valueOf(item.getQuantity())))
@@ -140,7 +159,7 @@ public class CartService {
         CartItem item = cart.getCartItems().stream()
                 .filter(i -> i.getCartItemId().equals(cartItemId))
                 .findFirst()
-                .orElseThrow(() -> new RuntimeException("Cart item not found: " + cartItemId));
+                .orElseThrow(() -> new CartItemNotFoundException("Cart item not found: " + cartItemId));
 
         // your code: set the new quantity on `item`
         int quantity =newQuantity ;
@@ -181,7 +200,7 @@ public class CartService {
     public Order getCheckoutCart(Long userId) {
         Cart cart = getOrCreateCart(userId);
         if (cart.getCartItems().isEmpty()) {
-            throw new RuntimeException("Cart is empty for user: " + userId);
+            throw new CartEmptyException("Cart is empty for user: " + userId);
         }
         Order order = convertToOrder(cart);
         return order;

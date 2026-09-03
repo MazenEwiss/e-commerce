@@ -1,11 +1,11 @@
-# Postman Testing Guide — E-Commerce Microservices (v2)
+# Postman Testing Guide — E-Commerce Microservices (v3)
 
-Covers: **wallet-service** (`localhost:8080`), **inventory-service** (`localhost:8082`), **shop-service** (`localhost:8081`).
+Covers: **wallet-service** (`localhost:8080`), **inventory-service** (`localhost:8082`), **shop-service** (`localhost:8081`), plus **gateway-service** (`localhost:8888`) as a single entry point once it's running.
 
-Updated from the original guide to reflect: the `/mine` → no-prefix naming cleanup, body-based deposit/withdraw/transfer with multi-wallet support, admin role/status endpoints, and the inventory category-path-variable fix.
+v3 changes from v2: transfer's `toWalletId`/`toUserId` behavior confirmed correct via live testing (no longer flagged); checkout now requires a `walletId` in the request body (multi-wallet support); Product's purchase/restock endpoints removed from this guide — they're used internally by the checkout/cancel saga via Feign, not meant for direct client testing.
 
 ## Before you start
-- All 3 services + Eureka (`localhost:8761`) should show all three registered.
+- All 3 services + Eureka (`localhost:8761`) should show all three registered. If `gateway-service` is up too, everything below can be hit through `http://localhost:8888` instead of each service's own port — same paths, one base URL.
 - Every protected endpoint needs `Authorization: Bearer <token>`. Get it from step 1.2, save it as a Postman collection variable (`{{token}}`).
 - **⚠️ Admin bootstrap gap:** there is currently no way to create the first admin through the API — every admin endpoint requires an existing admin. For now, after your first signup, manually promote that user directly in the wallet-service MySQL DB:
   ```sql
@@ -43,12 +43,12 @@ Expected: 200, `{ "token": "..." }`. **Save this token.**
 **GET** `http://localhost:8080/wallet/users` — Auth required.
 Expected: 200, user data, no password field.
 
-### 1.4 Update current user ⚠️
+### 1.4 Update current user
 **PATCH** `http://localhost:8080/wallet/users` — Auth required.
 ```json
 { "firstName": "Updated", "email": "updated@example.com" }
 ```
-Expected: 200, updated fields only — but likely to actually return a **400 validation error** every time. `UserRequestDto.password` is annotated `@NotBlank` but also `@JsonIgnore`, so it's never populated from the request body and fails validation regardless of what you send. Worth confirming live and flagging rather than debugging in the meeting.
+Expected: 200, updated fields only. Note: this endpoint has no `@Valid` on the controller parameter, so `@NotBlank` etc. on the DTO are never actually enforced — sending `"firstName": ""` will likely succeed and silently set an empty name, since the service only checks for `null`, not blank. Worth being aware of if a field seems to "disappear" during testing. Also test: try updating your email/username to one that another test account already has → expect a 400 (this duplicate check was added and should now block it, verify the response is a clean 4xx and not a raw DB constraint error).
 
 ### 1.5 Add a wallet
 **PATCH** `http://localhost:8080/wallet/users/add-wallet` — Auth required. Requires account status `ACTIVE` (promote via admin endpoints first if still `PENDING`).
@@ -64,7 +64,11 @@ Expected: 200, updated user showing the new wallet. **Save the new `walletId`** 
 ```
 Expected: 200, updated wallet. Only the wallet's owner should be able to rename it — try this with a different user's `walletId` too, expect a 403/404.
 
-### 1.7 Delete current user
+### 1.7 Remove a wallet
+**PATCH** `http://localhost:8080/wallet/users/remove-wallet/{walletId}` — Auth required.
+No body. Expected: 200, updated user with that wallet gone — but only if the wallet has 0 balance and no transaction history (same guard as deleting the whole user). Test the guard directly: try removing a wallet that still has a balance or a deposit in its history → expect 400. Also try someone else's `walletId` → expect a clean error, not a silent no-op.
+
+### 1.8 Delete current user
 **DELETE** `http://localhost:8080/wallet/users` — Auth required.
 Expected: 204 only if all of the user's wallets have 0 balance and no transaction history, otherwise 400. Test on a **throwaway signup**, not your main test account.
 
@@ -88,6 +92,9 @@ Expected: 200, updated user. Valid values: `PENDING`, `ACTIVE`, `SUSPENDED`, `RE
 ```
 Expected: 200, updated user. Same non-admin check as above.
 
+## 2.3 Get All Users
+**Get** `http://localhost:8080/wallet/users/all` - Auth required (admin).
+
 ---
 
 ## 3. Wallet-service — Wallet operations
@@ -108,14 +115,18 @@ Expected: 200, Transaction (DEPOSIT, COMPLETED) against that specific wallet. Tr
 ```
 Expected: 200. Try `"amount": 999999` too → expect 400 insufficient balance.
 
-### 3.3 Transfer 
+### 3.3 Transfer
 **POST** `http://localhost:8080/wallet/transfer` — Auth required.
 ```json
 { "walletId": 1, "toWalletId": 2, "toUserId": 2, "amount": 50 }
 ```
-Expected: 200, two Transaction rows (PAYMENT, one per wallet).
+Expected: 200, two Transaction rows (PAYMENT, one per wallet). Both `walletId`/`toWalletId` (which wallets move the money) and `toUserId` (verifies the destination wallet actually belongs to that user) are required — confirmed live, not redundant.
 
-### 3.4 Transaction history
+### 3.4 Get wallet balance
+**GET** `http://localhost:8080/wallet/balance/{walletId}` — Auth required.
+Expected: 200, raw balance (a number, not wrapped in an object). Try a `walletId` you don't own → expect 403/404, and try it while `PENDING` → expect the account-status check to block it same as deposit/withdraw.
+
+### 3.5 Transaction history
 **GET** `http://localhost:8080/wallet/transactions` — Auth required.
 Expected: 200, transactions across **all** of your wallets, newest first.
 
@@ -178,7 +189,9 @@ This previously failed (path variable was typed as the `Category` entity, never 
 ```
 Expected: 200, only price changes.
 
-### 5.7 Delete product
+*(Purchase/restock aren't listed here — they're called internally by the checkout/cancel saga via Feign, not meant for direct client testing.)*
+
+### 5.5 Delete product
 **DELETE** `http://localhost:8082/products/{productId}` — Auth required.
 Expected: 204. Use a spare product — not one you'll add to cart below.
 
@@ -186,12 +199,14 @@ Expected: 204. Use a spare product — not one you'll add to cart below.
 
 ## 6. Shop-service — Cart
 
-### 6.1 Add item to cart
+### 6.1 Add item(s) to cart 
 **POST** `http://localhost:8081/api/carts/items` — Auth required.
 ```json
-{ "productId": 1, "quantity": 2 }
+{ "productIds": [1, 2], "quantities": [2, 1] }
 ```
-Expected: 200/201, cart with item + `priceAtPurchase` captured from Inventory, correct `totalPrice`. Also try a nonexistent `productId` → expect 404, not silently accepted.
+**both lists must be the same length and in the same order** — a mismatch will likely throw an `IndexOutOfBoundsException` (probably surfaces as a 500) rather than a clean 400. Worth testing that mismatch case deliberately. Also test a nonexistent `productId` mixed into the list → expect the whole request to fail before anything is added (it validates all products up front). One more to test: send `"quantitys": [0]` — the DTO's `@Min(1)` is declared directly on the `List<Integer>` field, which isn't actually a valid target for that constraint, so it likely won't enforce per-element minimums at all (or could throw a validation-setup error instead of a normal 400) — good one to surface as a bug rather than debug live.
+
+Expected (happy path): 200/201, cart with item(s) + `priceAtPurchase` captured from Inventory, correct `totalPrice`.
 
 ### 6.2 Get cart
 **GET** `http://localhost:8081/api/carts` — Auth required.
@@ -216,7 +231,7 @@ Expected: 200/204, cart emptied.
 
 ## 7. Shop-service — Checkout & Order
 
-Checkout reads directly from your persisted Cart — no request body. Add items to cart (section 6) before running this.
+Checkout reads item/quantity/price from your persisted Cart; you only need to say which wallet pays. Add items to cart (section 6) before running this.
 
 ### 7.1 Checkout (place order from cart)
 **POST** `http://localhost:8081/api/carts/checkout` — Auth required.
@@ -226,9 +241,9 @@ Checkout reads directly from your persisted Cart — no request body. Add items 
 Expected: 201, order with status `PROCESSING` (happy path — stock reserved, wallet deducted). Confirm your cart is now empty (`GET /api/carts`) and the product's stock actually decreased (`GET /products/{id}` on inventory-service).
 Also test: add an item costing more than your wallet balance, checkout again → expect the order created with `PAYMENT_FAILED`, and stock correctly restored (compare product quantity before/after).
 
-### 7.2 Get order by ID ⚠️
+### 7.2 Get order by ID 
 **GET** `http://localhost:8081/api/orders/{orderId}` — Auth required.
-Works, but has no ownership check — any authenticated user can fetch any order by guessing an ID. The controller comment even flags this as test-only ("will be deleted in production"). Known gap, not a test failure.
+Works.
 
 ### 7.3 Get my orders
 **GET** `http://localhost:8081/api/orders` — Auth required.
@@ -243,13 +258,6 @@ Expected: 200, status `CANCELLED`, stock restocked, only works on `PENDING`/`PRO
 ## Known Gaps — flag these, don't debug live
 
 1. **No first-admin bootstrap mechanism.** Every admin endpoint requires an existing admin, and there's no seed/bootstrap path to create the first one — currently only reachable via a manual DB update. Worth discussing a fix (e.g. a startup check that promotes a configured user if zero admins exist).
-2. **`PATCH /wallet/users` likely broken.** `UserRequestDto.password` is `@NotBlank` + `@JsonIgnore`, so it can never be populated from the request and should fail validation on every call.
-3. **Transfer destination is ambiguous.** `TransactionRequestDto` carries both `toWalletId` and `toUserId` for `/wallet/transfer` — needs to be tested live to confirm which one the service actually resolves against, and the unused field should probably be removed.
-4. **`GET /api/orders/{id}`** has no ownership check — inconsistent with every other endpoint, and flagged in the code itself as test-only.
-5. **No FK guard** on deleting a Category still referenced by a Product, or a Product still referenced by an Order/Cart item — could throw a raw 500 instead of a clean 4xx.
-6. **Cancel's restock-on-failure** is only logged server-side (`System.err`), not retried or surfaced to the client if it fails.
-7. **`OrderRequestDto`/`OrderItemRequestDto` appear unused** — checkout takes no request body anymore, so these look like leftovers from before Cart→Order wiring. Worth confirming and removing if genuinely dead.
-8. **Transaction and Payment intentionally have no update/delete** endpoints — deliberate exception to the "all entities need CRUD" instruction, not an oversight.
 
 ---
 

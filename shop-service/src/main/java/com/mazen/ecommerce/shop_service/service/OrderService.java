@@ -8,19 +8,25 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
 import com.mazen.ecommerce.shop_service.client.InventoryClient;
+import com.mazen.ecommerce.shop_service.client.WalletClient;
 import com.mazen.ecommerce.shop_service.dto.OrderItemRequestDto;
 import com.mazen.ecommerce.shop_service.dto.OrderItemResponseDto;
 import com.mazen.ecommerce.shop_service.dto.OrderResponseDto;
 import com.mazen.ecommerce.shop_service.dto.ProductResponseDto;
+import com.mazen.ecommerce.shop_service.exception.CartEmptyException;
+import com.mazen.ecommerce.shop_service.exception.CartNotFoundException;
 import com.mazen.ecommerce.shop_service.exception.OrderNotCancellableException;
 import com.mazen.ecommerce.shop_service.exception.OrderNotFoundException;
 import com.mazen.ecommerce.shop_service.exception.OrderPlacementFailedException;
+import com.mazen.ecommerce.shop_service.exception.UserAuthorizationException;
+import com.mazen.ecommerce.shop_service.model.AccountStatus;
 import com.mazen.ecommerce.shop_service.model.Cart;
 import com.mazen.ecommerce.shop_service.model.Order;
 import com.mazen.ecommerce.shop_service.model.OrderItem;
 import com.mazen.ecommerce.shop_service.model.OrderStatus;
 import com.mazen.ecommerce.shop_service.model.Payment;
 import com.mazen.ecommerce.shop_service.model.PaymentStatus;
+import com.mazen.ecommerce.shop_service.model.UserRole;
 import com.mazen.ecommerce.shop_service.repository.CartItemRepository;
 import com.mazen.ecommerce.shop_service.repository.CartRepository;
 import com.mazen.ecommerce.shop_service.repository.OrderItemRepository;
@@ -38,8 +44,10 @@ public class OrderService {
     private final CartRepository cartRepository;
     private final CartService cartService;
     private final OrderItemRepository orderItemRepository;
-    private final CartItemRepository cartItemRepository  ;
-    public OrderService(OrderRepository orderRepository, OrderItemRepository orderItemRepository, CartRepository cartRepository, CartService cartService, PaymentService paymentService, InventoryClient inventoryClient, CartItemRepository cartItemRepository) {
+    private final CartItemRepository cartItemRepository;
+    private final WalletClient walletClient;
+
+    public OrderService(WalletClient walletClient, OrderRepository orderRepository, OrderItemRepository orderItemRepository, CartRepository cartRepository, CartService cartService, PaymentService paymentService, InventoryClient inventoryClient, CartItemRepository cartItemRepository) {
         this.orderRepository = orderRepository;
         this.paymentService = paymentService;
         this.inventoryClient = inventoryClient;
@@ -47,6 +55,7 @@ public class OrderService {
         this.cartService = cartService;
         this.orderItemRepository = orderItemRepository;
         this.cartItemRepository = cartItemRepository;
+        this.walletClient = walletClient;
     }
 
     private OrderResponseDto toOrderResponseDto(Order saved) {
@@ -76,12 +85,12 @@ public class OrderService {
 
         Order order = cartService.getCheckoutCart(userId);
         if (order == null) {
-            throw new RuntimeException("No items in cart for user: " + userId);
+            throw new CartEmptyException("No items in cart for user: " + userId);
         }
         Cart cart = cartRepository.findByUserId(userId)
-                .orElseThrow(() -> new RuntimeException("Cart not found for user: " + userId));
+                .orElseThrow(() -> new CartNotFoundException("Cart not found for user: " + userId));
         if (cart.getCartItems().isEmpty()) {
-            throw new RuntimeException("Cart is empty for user: " + userId);
+            throw new CartEmptyException("Cart is empty for user: " + userId);
         }
         List<OrderItem> orderItems = new ArrayList<>();
         // Tracks items successfully reserved so far, so we can compensate (restock) if a later item fails
@@ -108,6 +117,7 @@ public class OrderService {
                     } catch (FeignException restoreEx) {
                         // Log the error; in a real application, consider retrying or alerting
                         System.err.println("Failed to restock product " + toRestore.getProductId() + ": " + restoreEx.getMessage());
+                        throw new OrderPlacementFailedException("Failed to place order due to product issues: " + e.getMessage() + ". Additionally, failed to restock product " + toRestore.getProductId() + ": " + restoreEx.getMessage());
                     }
                 }
                 throw new OrderPlacementFailedException("Failed to place order due to product issues: " + e.getMessage());
@@ -148,6 +158,13 @@ public class OrderService {
     }
 
     public OrderResponseDto getOrderById(Long orderId) {
+        walletClient.getCurrentUser();
+        if (!walletClient.getCurrentUser().getBody().getRole().equals(UserRole.ADMIN)) {
+            throw new UserAuthorizationException("User does not have permission to view this order");
+        }
+        if ( !walletClient.getCurrentUser().getBody().getAccountStatus().equals(AccountStatus.ACTIVE)) {
+            throw new UserAuthorizationException("User account is not active. Current status: " + walletClient.getCurrentUser().getBody().getAccountStatus());
+        }
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new OrderNotFoundException("Order not found with id: " + orderId));
         return toOrderResponseDto(order);

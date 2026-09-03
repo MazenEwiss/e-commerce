@@ -143,5 +143,13 @@ public class WalletService {
         walletRepository.save(wallet);
         return new WalletResponseDto(wallet.getWalletId(), wallet.getWalletName(), wallet.getUser().getId(), wallet.getBalance());
     }
+    public BigDecimal getWalletBalance(Long walletId) {
+        Long userId = AuthUtil.getCurrentUserId();
+        Wallet wallet = walletRepository.findById(walletId)
+                .orElseThrow(() -> new WalletNotFoundException("Wallet not found for user: " + userId));
+        validateOwnerOfWallet(userId, wallet);
+        validateUserAccountStatus(userId);
+        return wallet.getBalance();
+    }
 
 }

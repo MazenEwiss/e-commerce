@@ -2,8 +2,6 @@ package com.mazen.ecommerce.wallet_service.dto;
 
 import java.util.List;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
-
 import jakarta.validation.constraints.NotBlank;
 
 public class UserRequestDto {
@@ -16,7 +14,6 @@ public class UserRequestDto {
     @NotBlank
     private String email;
     @NotBlank
-    @JsonIgnore
     private String password;
     private List<Long> walletId;
 
